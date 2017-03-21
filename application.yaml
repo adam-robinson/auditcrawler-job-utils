@@ -1,0 +1,28 @@
+---
+server:
+  applicationConnectors:
+    - type: http
+      port: 10205
+  adminConnectors:
+    - type: http
+      port: 10206
+
+logging:
+  level: DEBUG
+  appenders:
+    - type: file
+      currentLogFilename: "/var/log/searchmetrics/sm-audit-job-utils/application.log"
+      threshold: ALL
+      archive: true
+      archivedLogFilenamePattern: "/var/log/searchmetrics/sm-audit-job-utils/application.%i.log.zip"
+      archivedFileCount: 5
+      timeZone: UTC
+      logFormat: "%d{ISO8601} %-5p [%t] %c{1}: %m%n"
+      maxFileSize: 10MB
+    - type: console
+      threshold: ALL
+      timeZone: UTC
+      logFormat: "%d{ISO8601} %-5p [%t] %c{1}: %m%n"
+
+swagger:
+  resourcePackage: com.searchmetrics.auditcrawler
