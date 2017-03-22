@@ -4,16 +4,23 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import org.joda.time.DateTime;
 
+import javax.persistence.Column;
+import javax.persistence.Entity;
+import javax.persistence.Id;
+import javax.persistence.Table;
 import java.net.URL;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 
 import static com.google.common.base.Preconditions.checkNotNull;
+import static org.apache.commons.lang3.EnumUtils.isValidEnum;
 
 /**
  *
  */
+@Entity
+@Table( name = "jobs")
 public class CrawlerJob {
     public enum MaxPages {
         ZERO(0), FIFTY(50),
@@ -44,7 +51,9 @@ public class CrawlerJob {
         }
 
         public static MaxPages getMaxPagesFor(Integer integer) {
-            return MAX_PAGES_MAP.get(integer);
+            final MaxPages maxPages = MAX_PAGES_MAP.getOrDefault(integer, null);
+            checkNotNull(maxPages, "[{}] is not mapped to a valid MaxPages value!", integer);
+            return maxPages;
         }
 
         public static Integer getIntegerValue(MaxPages maxPages) {
@@ -91,26 +100,45 @@ public class CrawlerJob {
 
     enum Type {AUDIT, KEYWORD, URL_LIST};
 
+    @Id
     private final Long crawlId;
+    @Column
     private final String url;
+    @Column(name = "max_pages")
     private final Integer maxPages;
+    @Column(name = "type")
     private final String crawlType;
+    @Column(name = "keywjson")
     private final Optional<KeywordJSON> keywordJSON;
+    @Column(name = "deepjson")
     private final Optional<SSOAuditJSON> ssoAuditJSON;
+    @Column(name = "crawler")
     private final Integer crawlerNode;
+    @Column(name = "crawler_pid")
     private final Integer crawlerPid;
+    @Column
     private final DateTime createDate;
+    @Column(name = "callback")
     private final URL callbackURL;
+    @Column(name = "sm_url_id")
     private final Optional<Boolean> useSMUrlIds;
 
 
+    @Column(name = "prio")
     private Integer priority;
+    @Column(name = "real_pages")
     private Integer realPages = 0;
+    @Column(name = "err_count")
     private Integer errorCount = 0;
+    @Column(name = "status")
     private String crawlStatus = Status.NEW.name().toLowerCase();
+    @Column
     private Integer retries = 0;
+    @Column
     private Optional<DateTime> lastCrawl = Optional.empty();
+    @Column
     private Optional<Boolean> jobStopSent = Optional.empty();
+    @Column
     private Optional<Boolean> jobDone = Optional.empty();
 
     @JsonCreator
@@ -134,18 +162,19 @@ public class CrawlerJob {
 
         this.crawlId = checkNotNull(crawlId);
         this.url = checkNotNull(url);
-        this.maxPages = checkNotNull(MaxPages.getMaxPagesFor(maxPages).getIntegerValue());
-        this.crawlType = checkNotNull(crawlType);
-        this.keywordJSON = checkNotNull(keywordJSON);
-        this.ssoAuditJSON = checkNotNull(ssoAuditJSON);
+        this.maxPages = null != MaxPages.getMaxPagesFor(maxPages) ? maxPages : 0;
+        this.crawlType = checkNotNull(isValidEnum(Type.class, crawlType) ? crawlType : Type.AUDIT.name());
+        this.keywordJSON = keywordJSON.isPresent() ? keywordJSON : Optional.empty();
+        this.ssoAuditJSON = ssoAuditJSON.isPresent() ? ssoAuditJSON : Optional.empty();
         this.crawlerNode = checkNotNull(crawlerNode);
         this.crawlerPid = checkNotNull(crawlerPid);
         this.createDate = checkNotNull(createDate);
         this.callbackURL = checkNotNull(callbackURL);
 
-        this.priority = checkNotNull(Priority.getIntegerValue(Priority.getPriority(priority)));
+        this.priority = null != priority && null != Priority.getPriority(priority) ? priority : 0;
         this.useSMUrlIds = Optional.of(null != smUrlId ? true : crawlType.equals(Type.URL_LIST) ? false : true);
     }
+
 
     @JsonProperty("id")
     public Long getCrawlId() {
