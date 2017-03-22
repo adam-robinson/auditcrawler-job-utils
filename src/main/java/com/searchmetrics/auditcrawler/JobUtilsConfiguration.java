@@ -1,14 +1,15 @@
 package com.searchmetrics.auditcrawler;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.jcraft.jsch.JSch;
+import com.mysql.cj.jdbc.MysqlDataSource;
 import com.searchmetrics.auditcrawler.api.rest.JobUtilsResource;
 import io.dropwizard.Configuration;
 import io.federecio.dropwizard.swagger.SwaggerBundleConfiguration;
-import org.apache.commons.dbcp2.BasicDataSource;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.PropertySource;
+import org.springframework.core.env.Environment;
 import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
 
 import javax.sql.DataSource;
@@ -19,9 +20,12 @@ import javax.sql.DataSource;
  */
 @org.springframework.context.annotation.Configuration
 @ComponentScan("com.searchmetrics.auditcrawler.dao")
-@EnableJpaRepositories("com.searchmetrics.auditcrawler.dao")
+@EnableJpaRepositories(basePackages = "com.searchmetrics.auditcrawler.dao")
 @PropertySource(value = "classpath:application.properties")
 public class JobUtilsConfiguration extends Configuration {
+    @Autowired
+    Environment env;
+
     @JsonProperty("swagger")
     public SwaggerBundleConfiguration swaggerBundleConfiguration;
 
@@ -32,9 +36,11 @@ public class JobUtilsConfiguration extends Configuration {
 
     @Bean
     public DataSource dataSource() {
-        JSch jsch = new JSch();
+        MysqlDataSource mysqlDataSource = new MysqlDataSource();
+        mysqlDataSource.setURL(env.getProperty("spring.datasource.url"));
+        mysqlDataSource.setUser(env.getProperty("spring.datasource.username"));
+        mysqlDataSource.setPassword(env.getProperty("spring.datasource.password"));
 
-        BasicDataSource basicDataSource = new BasicDataSource();
-        return basicDataSource;
+        return mysqlDataSource;
     }
 }
