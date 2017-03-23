@@ -1,17 +1,22 @@
 package com.searchmetrics.auditcrawler.dto;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import org.joda.time.DateTime;
+import org.hibernate.annotations.Cache;
+import org.hibernate.annotations.CacheConcurrencyStrategy;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.persistence.Column;
 import javax.persistence.Entity;
 import javax.persistence.Id;
 import javax.persistence.Table;
-import java.net.URL;
+import java.io.Serializable;
+import java.text.ParseException;
+import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Optional;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 import static org.apache.commons.lang3.EnumUtils.isValidEnum;
@@ -21,7 +26,12 @@ import static org.apache.commons.lang3.EnumUtils.isValidEnum;
  */
 @Entity
 @Table( name = "jobs")
-public class CrawlerJob {
+@Cache(usage = CacheConcurrencyStrategy.READ_ONLY)
+public class CrawlerJob implements Serializable {
+
+    private static final Logger LOGGER =
+            LoggerFactory.getLogger(CrawlerJob.class);
+
     public enum MaxPages {
         ZERO(0), FIFTY(50),
         ONE_HUNDRED(100), FIVE_HUNDRED(500),
@@ -101,27 +111,27 @@ public class CrawlerJob {
     enum Type {AUDIT, KEYWORD, URL_LIST};
 
     @Id
-    private final Long crawlId;
+    private Long id;
     @Column
-    private final String url;
+    private String url;
     @Column(name = "max_pages")
-    private final Integer maxPages;
+    private Integer maxPages;
     @Column(name = "type")
-    private final String crawlType;
+    private String crawlType;
     @Column(name = "keywjson")
-    private final Optional<KeywordJSON> keywordJSON;
+    private String keywordJSON;
     @Column(name = "deepjson")
-    private final Optional<SSOAuditJSON> ssoAuditJSON;
+    private String ssoAuditJSON;
     @Column(name = "crawler")
-    private final Integer crawlerNode;
+    private Integer crawlerNode;
     @Column(name = "crawler_pid")
-    private final Integer crawlerPid;
+    private Integer crawlerPid;
     @Column
-    private final DateTime createDate;
+    private LocalDateTime createDate;
     @Column(name = "callback")
-    private final URL callbackURL;
+    private String callback;
     @Column(name = "sm_url_id")
-    private final Optional<Boolean> useSMUrlIds;
+    private Boolean useSMUrlIds;
 
 
     @Column(name = "prio")
@@ -135,50 +145,57 @@ public class CrawlerJob {
     @Column
     private Integer retries = 0;
     @Column
-    private Optional<DateTime> lastCrawl = Optional.empty();
+    private LocalDateTime lastCrawl;
     @Column
-    private Optional<Boolean> jobStopSent = Optional.empty();
+    private LocalDateTime jobStopSent;
     @Column
-    private Optional<Boolean> jobDone = Optional.empty();
+    private LocalDateTime jobDone;
+
+    public CrawlerJob(){}
 
     @JsonCreator
     public CrawlerJob(
-        @JsonProperty("id") final Long crawlId,
+        @JsonProperty("id") final Long id,
         @JsonProperty("url") final String url,
         @JsonProperty("prio") final Integer priority,
         @JsonProperty("max_pages") final Integer maxPages,
         @JsonProperty("type") final String crawlType,
         @JsonProperty("real_pages") final Integer realPages,
-        @JsonProperty("keywjson") final Optional<KeywordJSON> keywordJSON,
-        @JsonProperty("deepjson") final Optional<SSOAuditJSON> ssoAuditJSON,
+        @JsonProperty("keywjson") final String keywordJSON,
+        @JsonProperty("deepjson") final String ssoAuditJSON,
         @JsonProperty("err_count") final Integer errorCount,
         @JsonProperty("status") final String status,
         @JsonProperty("crawler") final Integer crawlerNode,
         @JsonProperty("crawler_pid") final Integer crawlerPid,
-        @JsonProperty("createDate") final DateTime createDate,
-        @JsonProperty("lastCrawl") final String lastCrawl,
-        @JsonProperty("callback") final URL callbackURL,
-        @JsonProperty("sm_url_id") final Integer smUrlId) {
+        @JsonProperty("createDate") final LocalDateTime createDate,
+        @JsonProperty("lastCrawl") final LocalDateTime lastCrawl,
+        @JsonProperty("jobStopSent") final LocalDateTime jobStopSent,
+        @JsonProperty("jobDone") final LocalDateTime jobDone,
+        @JsonProperty("callback") final String callback,
+        @JsonProperty("sm_url_id") final Integer smUrlId) throws ParseException {
 
-        this.crawlId = checkNotNull(crawlId);
+        this.id = checkNotNull(id);
         this.url = checkNotNull(url);
         this.maxPages = null != MaxPages.getMaxPagesFor(maxPages) ? maxPages : 0;
         this.crawlType = checkNotNull(isValidEnum(Type.class, crawlType) ? crawlType : Type.AUDIT.name());
-        this.keywordJSON = keywordJSON.isPresent() ? keywordJSON : Optional.empty();
-        this.ssoAuditJSON = ssoAuditJSON.isPresent() ? ssoAuditJSON : Optional.empty();
+        this.keywordJSON = keywordJSON;
+        this.ssoAuditJSON = ssoAuditJSON;
         this.crawlerNode = checkNotNull(crawlerNode);
         this.crawlerPid = checkNotNull(crawlerPid);
-        this.createDate = checkNotNull(createDate);
-        this.callbackURL = checkNotNull(callbackURL);
+        this.createDate = createDate;
+        this.lastCrawl = lastCrawl;
+        this.jobStopSent = jobStopSent;
+        this.jobDone = jobDone;
+        this.callback = checkNotNull(callback);
 
         this.priority = null != priority && null != Priority.getPriority(priority) ? priority : 0;
-        this.useSMUrlIds = Optional.of(null != smUrlId ? true : crawlType.equals(Type.URL_LIST) ? false : true);
+        this.useSMUrlIds = null != smUrlId ? true : (crawlType.equals(Type.URL_LIST) ? false : true);
     }
 
 
     @JsonProperty("id")
-    public Long getCrawlId() {
-        return crawlId;
+    public Long getId() {
+        return id;
     }
 
     @JsonProperty("url")
@@ -201,13 +218,15 @@ public class CrawlerJob {
         return crawlType;
     }
 
-    @JsonProperty("keywjson")
-    public Optional<KeywordJSON> getKeywordJSON() {
+    @JsonIgnore
+//    @JsonProperty("keywjson")
+    public String getKeywordJSON() {
         return keywordJSON;
     }
 
-    @JsonProperty("deepjson")
-    public Optional<SSOAuditJSON> getSsoAuditJSON() {
+    @JsonIgnore
+//    @JsonProperty("deepjson")
+    public String getSsoAuditJSON() {
         return ssoAuditJSON;
     }
 
@@ -221,18 +240,18 @@ public class CrawlerJob {
         return crawlerPid;
     }
 
-    @JsonProperty("keywjson")
-    public DateTime getCreateDate() {
+    @JsonProperty("createDate")
+    public LocalDateTime getCreateDate() {
         return createDate;
     }
 
     @JsonProperty("callback")
-    public URL getCallbackURL() {
-        return callbackURL;
+    public String getCallback() {
+        return callback;
     }
 
     @JsonProperty("sm_url_id")
-    public Optional<Boolean> getUseSMUrlIds() {
+    public Boolean getUseSMUrlIds() {
         return useSMUrlIds;
     }
 
@@ -257,18 +276,78 @@ public class CrawlerJob {
     }
 
     @JsonProperty("lastCrawl")
-    public Optional<DateTime> getLastCrawl() {
+    public LocalDateTime getLastCrawl() {
         return lastCrawl;
     }
 
     @JsonProperty("jobStopSent")
-    public Optional<Boolean> getJobStopSent() {
+    public LocalDateTime getJobStopSent() {
         return jobStopSent;
     }
 
     @JsonProperty("jobDone")
-    public Optional<Boolean> getJobDone() {
+    public LocalDateTime getJobDone() {
         return jobDone;
+    }
+
+    @JsonProperty("id")
+    public void setId(Long id) {
+        this.id = id;
+    }
+
+    @JsonProperty("url")
+    public void setUrl(String url) {
+        this.url = url;
+    }
+
+    @JsonProperty("max_pages")
+    public void setMaxPages(Integer maxPages) {
+        this.maxPages = maxPages;
+    }
+
+    @JsonProperty("type")
+    public void setCrawlType(String crawlType) {
+        this.crawlType = crawlType;
+    }
+
+    @JsonProperty("keywjson")
+    public void setKeywordJSON(String keywordJSON) {
+        this.keywordJSON = keywordJSON;
+    }
+
+    @JsonProperty("deepjson")
+    public void setSsoAuditJSON(String ssoAuditJSON) {
+        this.ssoAuditJSON = ssoAuditJSON;
+    }
+
+    @JsonProperty("crawler")
+    public void setCrawlerNode(Integer crawlerNode) {
+        this.crawlerNode = crawlerNode;
+    }
+
+    @JsonProperty("crawler_pid")
+    public void setCrawlerPid(Integer crawlerPid) {
+        this.crawlerPid = crawlerPid;
+    }
+
+    @JsonProperty("createDate")
+    public void setCreateDate(LocalDateTime createDate) {
+        this.createDate = createDate;
+    }
+
+    @JsonProperty("callback")
+    public void setCallback(String callback) {
+        this.callback = callback;
+    }
+
+    @JsonProperty("sm_url_id")
+    public void setUseSMUrlIds(Boolean useSMUrlIds) {
+        this.useSMUrlIds = useSMUrlIds;
+    }
+
+    @JsonProperty("status")
+    public void setCrawlStatus(String crawlStatus) {
+        this.crawlStatus = crawlStatus;
     }
 
     @JsonProperty("prio")
@@ -295,17 +374,17 @@ public class CrawlerJob {
     }
 
     @JsonProperty("lastCrawl")
-    public void setLastCrawl(Optional<DateTime> lastCrawl) {
+    public void setLastCrawl(LocalDateTime lastCrawl) {
         this.lastCrawl = lastCrawl;
     }
 
     @JsonProperty("jobStopSent")
-    public void setJobStopSent(Optional<Boolean> jobStopSent) {
+    public void setJobStopSent(LocalDateTime jobStopSent) {
         this.jobStopSent = jobStopSent;
     }
 
     @JsonProperty("jobDone")
-    public void setJobDone(Optional<Boolean> jobDone) {
+    public void setJobDone(LocalDateTime jobDone) {
         this.jobDone = jobDone;
     }
 
@@ -316,7 +395,7 @@ public class CrawlerJob {
 
         CrawlerJob that = (CrawlerJob) o;
 
-        if (! crawlId.equals(that.crawlId)) return false;
+        if (! id.equals(that.id)) return false;
         if (! url.equals(that.url)) return false;
         if (priority != that.priority) return false;
         if (maxPages != that.maxPages) return false;
@@ -326,7 +405,7 @@ public class CrawlerJob {
         if (! crawlerNode.equals(that.crawlerNode)) return false;
         if (! crawlerPid.equals(that.crawlerPid)) return false;
         if (! createDate.equals(that.createDate)) return false;
-        if (! callbackURL.equals(that.callbackURL)) return false;
+        if (! callback.equals(that.callback)) return false;
         if (! useSMUrlIds.equals(that.useSMUrlIds)) return false;
         if (! realPages.equals(that.realPages)) return false;
         if (! errorCount.equals(that.errorCount)) return false;
@@ -339,7 +418,7 @@ public class CrawlerJob {
 
     @Override
     public int hashCode() {
-        int result = crawlId.hashCode();
+        int result = id.hashCode();
         result = 31 * result + url.hashCode();
         result = 31 * result + priority.hashCode();
         result = 31 * result + maxPages.hashCode();
@@ -349,7 +428,7 @@ public class CrawlerJob {
         result = 31 * result + crawlerNode.hashCode();
         result = 31 * result + crawlerPid.hashCode();
         result = 31 * result + createDate.hashCode();
-        result = 31 * result + callbackURL.hashCode();
+        result = 31 * result + callback.hashCode();
         result = 31 * result + useSMUrlIds.hashCode();
         result = 31 * result + realPages.hashCode();
         result = 31 * result + errorCount.hashCode();

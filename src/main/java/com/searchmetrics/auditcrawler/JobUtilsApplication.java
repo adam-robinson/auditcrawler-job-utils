@@ -1,7 +1,13 @@
 package com.searchmetrics.auditcrawler;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
 import com.searchmetrics.auditcrawler.api.rest.JobUtilsResource;
+import com.searchmetrics.auditcrawler.dao.CrawlerJobAggregationDAO;
+import com.searchmetrics.auditcrawler.dao.CrawlerJobsRepository;
 import io.dropwizard.Application;
+import io.dropwizard.jackson.Jackson;
+import io.dropwizard.jersey.jackson.JacksonMessageBodyProvider;
 import io.dropwizard.setup.Bootstrap;
 import io.dropwizard.setup.Environment;
 import io.federecio.dropwizard.swagger.SwaggerBundle;
@@ -39,9 +45,18 @@ public class JobUtilsApplication extends Application<JobUtilsConfiguration> {
                 new AnnotationConfigApplicationContext(
                         JobUtilsConfiguration.class
                 );
-        final JobUtilsResource jobUtilsResource =
-                applicationContext.getBean(JobUtilsResource.class);
 
+        final CrawlerJobsRepository crawlerJobsRepository =
+                applicationContext.getBean(CrawlerJobsRepository.class);
+        final CrawlerJobAggregationDAO crawlerJobAggregationDAO =
+                applicationContext.getBean(CrawlerJobAggregationDAO.class);
+        final JobUtilsResource jobUtilsResource =
+                new JobUtilsResource(crawlerJobAggregationDAO, crawlerJobsRepository);
+
+        final ObjectMapper objectMapper = Jackson.newObjectMapper();
+        objectMapper.configure(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS, false);
+
+        environment.jersey().register(new JacksonMessageBodyProvider(objectMapper));
         environment.jersey().register(jobUtilsResource);
 
     }
